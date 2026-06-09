@@ -2,6 +2,8 @@
 
 An Ableton Live extension for quickly muting/unmuting tracks and renaming them in preparation for stem exports. Save multiple named configurations per project and switch between them instantly.
 
+**NOTE:** Currently the Ableton Extensions SDK does not expose any export functionality, so this cannot export for you. But it can help you mute/unmute different tracks and rename them in preparation for stem exporting.
+
 ---
 
 ## User Guide
