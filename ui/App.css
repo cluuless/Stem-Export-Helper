@@ -44,6 +44,45 @@ body {
   font-weight: 600;
 }
 
+/* ---- Session bar ---- */
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #2a2e38;
+  flex-shrink: 0;
+}
+
+.session-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6b7585;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.session-input {
+  flex: 1;
+  background: #1a1e28;
+  border: 1px solid #2e3444;
+  border-radius: 5px;
+  color: #f3f5f8;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 3px 8px;
+  outline: none;
+}
+
+.session-input:focus {
+  border-color: #4a6fa8;
+}
+
+.session-input::placeholder {
+  color: #3a4050;
+}
+
 /* ---- Top row: Jobs + Tracks ---- */
 .app-body {
   display: flex;
@@ -308,6 +347,63 @@ body {
 
 .batch-rename-footer {
   padding: 2px 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-regex-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #8090a8;
+  cursor: pointer;
+  user-select: none;
+}
+
+.batch-regex-error {
+  font-size: 11px;
+  color: #c87c2a;
+  flex: 1;
+}
+
+.batch-regex-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 2px;
+}
+
+.batch-regex-hints-label {
+  font-size: 10px;
+  color: #4a5263;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.batch-regex-hint-btn {
+  background: #1a1e28;
+  border: 1px solid #2e3444;
+  border-radius: 4px;
+  color: #8090a8;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+
+.batch-regex-hint-btn:hover {
+  background: #252c3f;
+  border-color: #4a5a70;
+  color: #b0c4d8;
+}
+
+.batch-rename-apply {
+  padding: 4px 10px 0;
 }
 
 /* ---- Settings accordion ---- */
@@ -472,5 +568,64 @@ body {
 
 .btn-primary:hover {
   background: #4568b0;
+}
+
+/* ---- Stale track warning ---- */
+.stale-warning {
+  background: #251a0e;
+  border: 1px solid #5a3a10;
+  border-radius: 5px;
+  margin: 4px 6px;
+  padding: 6px 8px;
+  flex-shrink: 0;
+}
+
+.stale-warning-header {
+  font-size: 11px;
+  color: #c87c2a;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.stale-track-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.stale-track-name {
+  font-size: 12px;
+  color: #a08060;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stale-track-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.stale-remap-select {
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  border-radius: 4px;
+  color: #b0b8c8;
+  font-size: 11px;
+  padding: 2px 4px;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 120px;
+}
+
+.stale-remap-select:focus {
+  border-color: #4a6fa8;
+  outline: none;
 }
 

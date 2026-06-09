@@ -1359,6 +1359,39 @@ body {
   color: #6b7585;
   font-weight: 600;
 }
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #2a2e38;
+  flex-shrink: 0;
+}
+.session-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6b7585;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.session-input {
+  flex: 1;
+  background: #1a1e28;
+  border: 1px solid #2e3444;
+  border-radius: 5px;
+  color: #f3f5f8;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 3px 8px;
+  outline: none;
+}
+.session-input:focus {
+  border-color: #4a6fa8;
+}
+.session-input::placeholder {
+  color: #3a4050;
+}
 .app-body {
   display: flex;
   flex: 1;
@@ -1584,6 +1617,56 @@ body {
 }
 .batch-rename-footer {
   padding: 2px 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.batch-regex-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #8090a8;
+  cursor: pointer;
+  user-select: none;
+}
+.batch-regex-error {
+  font-size: 11px;
+  color: #c87c2a;
+  flex: 1;
+}
+.batch-regex-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 2px;
+}
+.batch-regex-hints-label {
+  font-size: 10px;
+  color: #4a5263;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+.batch-regex-hint-btn {
+  background: #1a1e28;
+  border: 1px solid #2e3444;
+  border-radius: 4px;
+  color: #8090a8;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+.batch-regex-hint-btn:hover {
+  background: #252c3f;
+  border-color: #4a5a70;
+  color: #b0c4d8;
+}
+.batch-rename-apply {
+  padding: 4px 10px 0;
 }
 .section-settings {
   border-top: 1px solid #2a2e38;
@@ -1723,6 +1806,57 @@ body {
 }
 .btn-primary:hover {
   background: #4568b0;
+}
+.stale-warning {
+  background: #251a0e;
+  border: 1px solid #5a3a10;
+  border-radius: 5px;
+  margin: 4px 6px;
+  padding: 6px 8px;
+  flex-shrink: 0;
+}
+.stale-warning-header {
+  font-size: 11px;
+  color: #c87c2a;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.stale-track-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 0;
+}
+.stale-track-name {
+  font-size: 12px;
+  color: #a08060;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stale-track-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.stale-remap-select {
+  background: #1a1e28;
+  border: 1px solid #3a4050;
+  border-radius: 4px;
+  color: #b0b8c8;
+  font-size: 11px;
+  padding: 2px 4px;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 120px;
+}
+.stale-remap-select:focus {
+  border-color: #4a6fa8;
+  outline: none;
 }
 </style>
   </head>
@@ -14489,12 +14623,12 @@ body {
   function loadPayload() {
     try {
       const el = document.getElementById("__stem-export-helper-data__");
-      if (!el) return { tracks: [], savedConfigs: [] };
+      if (!el) return { tracks: [], sessions: {}, currentSession: "" };
       const raw = JSON.parse(el.textContent ?? "{}");
-      if (Array.isArray(raw)) return { tracks: raw, savedConfigs: [] };
+      if (Array.isArray(raw)) return { tracks: raw, sessions: {}, currentSession: "" };
       return raw;
     } catch {
-      return { tracks: [], savedConfigs: [] };
+      return { tracks: [], sessions: {}, currentSession: "" };
     }
   }
   function buildTrackTree(flat) {
@@ -14615,7 +14749,9 @@ body {
   var _flatTracks = _payload.tracks;
   var _tracks = buildTrackTree(_flatTracks);
   var _allIds = allTrackIds(_tracks);
-  var _savedConfigs = _payload.savedConfigs;
+  var _sessions = _payload.sessions ?? {};
+  var _currentSession = _payload.currentSession ?? "";
+  var _initialConfigs = _sessions[_currentSession] ?? [];
   function collectCheckedTracks(list, ids, result = []) {
     for (const t of list) {
       if (ids.has(t.id)) result.push(t);
@@ -14626,30 +14762,36 @@ body {
   function App() {
     const [tracks] = (0, import_react.useState)(_tracks);
     const [configs, setConfigs] = (0, import_react.useState)(() => {
-      if (_savedConfigs.length > 0) return _savedConfigs;
-      return [{ id: "config-1", name: "Default", checkedTrackIds: _allIds, trackRenames: {} }];
+      if (_initialConfigs.length > 0) return _initialConfigs;
+      return [{ id: "config-1", name: "Default", checkedTrackIds: _allIds, trackRenames: {}, staleTrackNames: [] }];
     });
     const [selectedConfigId, setSelectedConfigId] = (0, import_react.useState)(
-      () => _savedConfigs.length > 0 ? _savedConfigs[0].id : "config-1"
+      () => _initialConfigs.length > 0 ? _initialConfigs[0].id : "config-1"
     );
     const [configEditId, setConfigEditId] = (0, import_react.useState)(null);
     const [configEditValue, setConfigEditValue] = (0, import_react.useState)("");
     const fileInputRef = (0, import_react.useRef)(null);
     const [checkedTracks, setCheckedTracks] = (0, import_react.useState)(
-      () => new Set(_savedConfigs.length > 0 ? _savedConfigs[0].checkedTrackIds : _allIds)
+      () => new Set(_initialConfigs.length > 0 ? _initialConfigs[0].checkedTrackIds : _allIds)
     );
     const [trackRenames, setTrackRenames] = (0, import_react.useState)(
-      () => _savedConfigs.length > 0 ? _savedConfigs[0].trackRenames : {}
+      () => _initialConfigs.length > 0 ? _initialConfigs[0].trackRenames : {}
     );
+    const [staleTrackNames, setStaleTrackNames] = (0, import_react.useState)(
+      () => _initialConfigs.length > 0 ? _initialConfigs[0].staleTrackNames ?? [] : []
+    );
+    const [sessionName, setSessionName] = (0, import_react.useState)(_currentSession);
     const [batchPrefix, setBatchPrefix] = (0, import_react.useState)("");
     const [batchSuffix, setBatchSuffix] = (0, import_react.useState)("");
     const [batchFind, setBatchFind] = (0, import_react.useState)("");
     const [batchReplace, setBatchReplace] = (0, import_react.useState)("");
+    const [batchRegex, setBatchRegex] = (0, import_react.useState)(false);
+    const [batchRegexError, setBatchRegexError] = (0, import_react.useState)("");
     const [batchOpen, setBatchOpen] = (0, import_react.useState)(false);
     function selectConfig(id) {
       setConfigs(
         (prev) => prev.map(
-          (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames } : c
+          (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames } : c
         )
       );
       const cfg = configs.find((c) => c.id === id);
@@ -14657,6 +14799,7 @@ body {
         setSelectedConfigId(id);
         setCheckedTracks(new Set(cfg.checkedTrackIds));
         setTrackRenames(cfg.trackRenames);
+        setStaleTrackNames(cfg.staleTrackNames ?? []);
       }
     }
     function newConfig() {
@@ -14666,7 +14809,7 @@ body {
       const snapshotRenames = { ...trackRenames };
       setConfigs((prev) => {
         const saved = prev.map(
-          (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: snapshotChecked, trackRenames: snapshotRenames } : c
+          (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: snapshotChecked, trackRenames: snapshotRenames, staleTrackNames } : c
         );
         return [
           ...saved,
@@ -14674,11 +14817,13 @@ body {
             id: newId,
             name: `${currentName} copy`,
             checkedTrackIds: snapshotChecked,
-            trackRenames: snapshotRenames
+            trackRenames: snapshotRenames,
+            staleTrackNames: []
           }
         ];
       });
       setSelectedConfigId(newId);
+      setStaleTrackNames([]);
     }
     function deleteConfig(id) {
       if (configs.length <= 1) return;
@@ -14689,6 +14834,7 @@ body {
         setSelectedConfigId(first.id);
         setCheckedTracks(new Set(first.checkedTrackIds));
         setTrackRenames(first.trackRenames);
+        setStaleTrackNames(first.staleTrackNames ?? []);
       }
     }
     function startConfigRename(id, name) {
@@ -14729,12 +14875,14 @@ body {
               id: c.id,
               name: c.name,
               checkedTrackIds: Array.isArray(c.checkedTrackIds) ? c.checkedTrackIds : allTrackIds(tracks),
-              trackRenames: c.trackRenames && typeof c.trackRenames === "object" ? c.trackRenames : {}
+              trackRenames: c.trackRenames && typeof c.trackRenames === "object" ? c.trackRenames : {},
+              staleTrackNames: Array.isArray(c.staleTrackNames) ? c.staleTrackNames : []
             }));
             setConfigs(normalized);
             setSelectedConfigId(normalized[0].id);
             setCheckedTracks(new Set(normalized[0].checkedTrackIds));
             setTrackRenames(normalized[0].trackRenames);
+            setStaleTrackNames(normalized[0].staleTrackNames);
           }
         } catch {
         }
@@ -14758,12 +14906,57 @@ body {
     function renameTrack(id, name) {
       setTrackRenames((prev) => ({ ...prev, [id]: name }));
     }
+    function removeStaleTrack(name) {
+      setStaleTrackNames((prev) => prev.filter((n) => n !== name));
+    }
+    function remapStaleTrack(staleName, newTrackId) {
+      if (!newTrackId) return;
+      setConfigs(
+        (prev) => prev.map((c) => {
+          const alreadyChecked = c.checkedTrackIds.includes(newTrackId);
+          return {
+            ...c,
+            checkedTrackIds: alreadyChecked ? c.checkedTrackIds : [...c.checkedTrackIds, newTrackId],
+            staleTrackNames: (c.staleTrackNames ?? []).filter((n) => n !== staleName)
+          };
+        })
+      );
+      setCheckedTracks((prev) => {
+        const next = new Set(prev);
+        next.add(newTrackId);
+        return next;
+      });
+      setStaleTrackNames((prev) => prev.filter((n) => n !== staleName));
+    }
+    function handleSessionChange(name) {
+      setSessionName(name);
+      const saved = _sessions[name];
+      if (saved && saved.length > 0) {
+        setConfigs(saved);
+        setSelectedConfigId(saved[0].id);
+        setCheckedTracks(new Set(saved[0].checkedTrackIds));
+        setTrackRenames(saved[0].trackRenames);
+        setStaleTrackNames(saved[0].staleTrackNames ?? []);
+      }
+    }
     function applyBatchRename() {
+      let regex = null;
+      if (batchFind && batchRegex) {
+        try {
+          regex = new RegExp(batchFind, "g");
+          setBatchRegexError("");
+        } catch {
+          setBatchRegexError("Invalid regex");
+          return;
+        }
+      }
       const checked = collectCheckedTracks(tracks, checkedTracks);
       const updates = {};
       for (const t of checked) {
         let name = trackRenames[t.id] ?? t.name;
-        if (batchFind) name = name.split(batchFind).join(batchReplace);
+        if (batchFind) {
+          name = regex ? name.replace(regex, batchReplace) : name.split(batchFind).join(batchReplace);
+        }
         if (batchPrefix) name = batchPrefix + name;
         if (batchSuffix) name = name + batchSuffix;
         updates[t.id] = name;
@@ -14773,9 +14966,26 @@ body {
       setBatchSuffix("");
       setBatchFind("");
       setBatchReplace("");
+      setBatchRegexError("");
     }
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "app-shell", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "app-header", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "app-title", children: "Stem Export Helper" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "session-bar", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", { className: "session-label", htmlFor: "session-input", children: "Session" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "input",
+          {
+            id: "session-input",
+            className: "session-input",
+            type: "text",
+            list: "session-list",
+            value: sessionName,
+            placeholder: "Required \u2014 Name this session to save configs.",
+            onChange: (e) => handleSessionChange(e.target.value)
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("datalist", { id: "session-list", children: Object.keys(_sessions).map((name) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: name }, name)) })
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "app-body", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "section section-jobs", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "section-label", children: "Configs" }),
@@ -14827,45 +15037,7 @@ body {
             },
             cfg.id
           )) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "config-toolbar", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost config-toolbar-btn config-toolbar-new", onClick: newConfig, children: "+ New Config" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "config-toolbar-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: "btn-ghost config-toolbar-btn",
-                  title: "Load configs from file",
-                  onClick: () => fileInputRef.current?.click(),
-                  children: "Load"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: "btn-ghost config-toolbar-btn",
-                  title: "Save all configs to file",
-                  onClick: saveToFile,
-                  children: "Save"
-                }
-              )
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "input",
-            {
-              ref: fileInputRef,
-              type: "file",
-              accept: ".json",
-              style: { display: "none" },
-              onChange: (e) => {
-                const file = e.target.files?.[0];
-                if (file) loadFromFile(file);
-                e.target.value = "";
-              }
-            }
-          )
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "config-toolbar", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost config-toolbar-btn config-toolbar-new", onClick: newConfig, children: "+ New Config" }) })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "section section-tracks", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "section-header-row", children: [
@@ -14875,6 +15047,47 @@ body {
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-xs", onClick: selectAll, children: "All" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-xs", onClick: deselectAll, children: "None" })
             ] })
+          ] }),
+          staleTrackNames.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "stale-warning", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "stale-warning-header", children: [
+              "\u26A0 ",
+              staleTrackNames.length,
+              " saved track",
+              staleTrackNames.length !== 1 ? "s" : "",
+              " not found in this session"
+            ] }),
+            staleTrackNames.map((name) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "stale-track-row", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "stale-track-name", children: [
+                '"',
+                name,
+                '"'
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "stale-track-actions", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+                  "select",
+                  {
+                    className: "stale-remap-select",
+                    defaultValue: "",
+                    onChange: (e) => {
+                      if (e.target.value) remapStaleTrack(name, e.target.value);
+                    },
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "", children: "Remap to\u2026" }),
+                      _flatTracks.map((t) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: t.id, children: t.name }, t.id))
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    className: "btn-ghost btn-xs",
+                    onClick: () => removeStaleTrack(name),
+                    children: "Delete"
+                  }
+                )
+              ] })
+            ] }, name))
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "track-list", children: tracks.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "tracks-empty", children: "No tracks found." }) : tracks.map((track) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
             TrackItem,
@@ -14916,8 +15129,11 @@ body {
                     className: "field-input",
                     type: "text",
                     value: batchFind,
-                    placeholder: "text to find",
-                    onChange: (e) => setBatchFind(e.target.value)
+                    placeholder: batchRegex ? "regex pattern" : "text to find",
+                    onChange: (e) => {
+                      setBatchFind(e.target.value);
+                      setBatchRegexError("");
+                    }
                   }
                 )
               ] }),
@@ -14929,7 +15145,7 @@ body {
                     className: "field-input",
                     type: "text",
                     value: batchReplace,
-                    placeholder: "replace with",
+                    placeholder: batchRegex ? "replacement (use $1, $2\u2026)" : "replace with",
                     onChange: (e) => setBatchReplace(e.target.value)
                   }
                 )
@@ -14961,7 +15177,41 @@ body {
                 )
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "batch-rename-footer", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "batch-rename-footer", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "batch-regex-toggle", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: batchRegex, onChange: (e) => {
+                  setBatchRegex(e.target.checked);
+                  setBatchRegexError("");
+                } }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Regex" })
+              ] }),
+              batchRegexError && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "batch-regex-error", children: batchRegexError })
+            ] }),
+            batchRegex && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "batch-regex-hints", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "batch-regex-hints-label", children: "Common patterns:" }),
+              [
+                { label: "Remove numbers", find: "\\d+", replace: "" },
+                { label: "Remove leading numbers", find: "^\\d+\\s*", replace: "" },
+                { label: "Remove trailing numbers", find: "\\s*\\d+$", replace: "" },
+                { label: "Remove parentheses", find: "\\s*\\([^)]*\\)", replace: "" },
+                { label: "Trim spaces", find: "^\\s+|\\s+$", replace: "" },
+                { label: "Collapse spaces", find: "\\s+", replace: " " }
+              ].map((h) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "batch-regex-hint-btn",
+                  onClick: () => {
+                    setBatchFind(h.find);
+                    setBatchReplace(h.replace);
+                    setBatchRegexError("");
+                  },
+                  children: h.label
+                },
+                h.label
+              ))
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "batch-rename-apply", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
               "button",
               {
                 type: "button",
@@ -14994,11 +15244,12 @@ body {
             {
               type: "button",
               className: "btn-ghost btn-sm",
+              disabled: !sessionName.trim(),
               onClick: () => {
                 const snapshot = configs.map(
-                  (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames } : c
+                  (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames } : c
                 );
-                closeWithResult(JSON.stringify({ action: "save", configs: snapshot }));
+                closeWithResult(JSON.stringify({ action: "save", sessionName, configs: snapshot }));
               },
               children: "Save"
             }
@@ -15008,13 +15259,14 @@ body {
             {
               type: "button",
               className: "btn-primary",
-              disabled: checkedTracks.size === 0,
+              disabled: checkedTracks.size === 0 || !sessionName.trim(),
               onClick: () => {
                 const snapshot = configs.map(
-                  (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames } : c
+                  (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames } : c
                 );
                 const payload = JSON.stringify({
                   action: "apply",
+                  sessionName,
                   checkedTrackIds: [...checkedTracks],
                   trackRenames,
                   configs: snapshot

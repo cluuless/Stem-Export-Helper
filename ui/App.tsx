@@ -7,6 +7,7 @@ interface Config {
   name: string;
   checkedTrackIds: string[];
   trackRenames: Record<string, string>;
+  staleTrackNames: string[];
 }
 
 interface Track {
@@ -27,20 +28,20 @@ interface TrackData {
 // Shape of the injected data payload from extension.ts
 interface InjectedPayload {
   tracks: TrackData[];
-  savedConfigs: Config[];
+  sessions: Record<string, Config[]>; // sessionName → saved configs
+  currentSession: string;
 }
 
 // --- Load tracks from the data tag injected by extension.ts ---
 function loadPayload(): InjectedPayload {
   try {
     const el = document.getElementById("__stem-export-helper-data__");
-    if (!el) return { tracks: [], savedConfigs: [] };
+    if (!el) return { tracks: [], sessions: {}, currentSession: "" };
     const raw = JSON.parse(el.textContent ?? "{}");
-    // Support old flat-array format as fallback
-    if (Array.isArray(raw)) return { tracks: raw as TrackData[], savedConfigs: [] };
+    if (Array.isArray(raw)) return { tracks: raw as TrackData[], sessions: {}, currentSession: "" };
     return raw as InjectedPayload;
   } catch {
-    return { tracks: [], savedConfigs: [] };
+    return { tracks: [], sessions: {}, currentSession: "" };
   }
 }
 
@@ -184,7 +185,9 @@ const _payload = loadPayload();
 const _flatTracks = _payload.tracks;
 const _tracks = buildTrackTree(_flatTracks);
 const _allIds = allTrackIds(_tracks);
-const _savedConfigs = _payload.savedConfigs;
+const _sessions = _payload.sessions ?? {};
+const _currentSession = _payload.currentSession ?? "";
+const _initialConfigs: Config[] = _sessions[_currentSession] ?? [];
 
 // --- Main App ---
 function collectCheckedTracks(list: Track[], ids: Set<string>, result: Track[] = []): Track[] {
@@ -198,27 +201,33 @@ function collectCheckedTracks(list: Track[], ids: Set<string>, result: Track[] =
 export function App() {
   const [tracks] = useState<Track[]>(_tracks);
   const [configs, setConfigs] = useState<Config[]>(() => {
-    if (_savedConfigs.length > 0) return _savedConfigs;
-    return [{ id: "config-1", name: "Default", checkedTrackIds: _allIds, trackRenames: {} }];
+    if (_initialConfigs.length > 0) return _initialConfigs;
+    return [{ id: "config-1", name: "Default", checkedTrackIds: _allIds, trackRenames: {}, staleTrackNames: [] }];
   });
   const [selectedConfigId, setSelectedConfigId] = useState<string>(() =>
-    _savedConfigs.length > 0 ? _savedConfigs[0].id : "config-1",
+    _initialConfigs.length > 0 ? _initialConfigs[0].id : "config-1",
   );
   const [configEditId, setConfigEditId] = useState<string | null>(null);
   const [configEditValue, setConfigEditValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [checkedTracks, setCheckedTracks] = useState<Set<string>>(() =>
-    new Set(_savedConfigs.length > 0 ? _savedConfigs[0].checkedTrackIds : _allIds),
+    new Set(_initialConfigs.length > 0 ? _initialConfigs[0].checkedTrackIds : _allIds),
   );
   const [trackRenames, setTrackRenames] = useState<Record<string, string>>(() =>
-    _savedConfigs.length > 0 ? _savedConfigs[0].trackRenames : {},
+    _initialConfigs.length > 0 ? _initialConfigs[0].trackRenames : {},
   );
+  const [staleTrackNames, setStaleTrackNames] = useState<string[]>(() =>
+    _initialConfigs.length > 0 ? (_initialConfigs[0].staleTrackNames ?? []) : [],
+  );
+  const [sessionName, setSessionName] = useState(_currentSession);
 
   // Batch rename state
   const [batchPrefix, setBatchPrefix] = useState("");
   const [batchSuffix, setBatchSuffix] = useState("");
   const [batchFind, setBatchFind] = useState("");
   const [batchReplace, setBatchReplace] = useState("");
+  const [batchRegex, setBatchRegex] = useState(false);
+  const [batchRegexError, setBatchRegexError] = useState("");
   const [batchOpen, setBatchOpen] = useState(false);
 
   // --- Config management ---
@@ -226,7 +235,7 @@ export function App() {
     setConfigs((prev) =>
       prev.map((c) =>
         c.id === selectedConfigId
-          ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames }
+          ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames }
           : c,
       ),
     );
@@ -235,6 +244,7 @@ export function App() {
       setSelectedConfigId(id);
       setCheckedTracks(new Set(cfg.checkedTrackIds));
       setTrackRenames(cfg.trackRenames);
+      setStaleTrackNames(cfg.staleTrackNames ?? []);
     }
   }
 
@@ -246,7 +256,7 @@ export function App() {
     setConfigs((prev) => {
       const saved = prev.map((c) =>
         c.id === selectedConfigId
-          ? { ...c, checkedTrackIds: snapshotChecked, trackRenames: snapshotRenames }
+          ? { ...c, checkedTrackIds: snapshotChecked, trackRenames: snapshotRenames, staleTrackNames }
           : c,
       );
       return [
@@ -256,10 +266,12 @@ export function App() {
           name: `${currentName} copy`,
           checkedTrackIds: snapshotChecked,
           trackRenames: snapshotRenames,
+          staleTrackNames: [],
         },
       ];
     });
     setSelectedConfigId(newId);
+    setStaleTrackNames([]);
     // New config starts with the same live state — no reset needed
   }
 
@@ -272,6 +284,7 @@ export function App() {
       setSelectedConfigId(first.id);
       setCheckedTracks(new Set(first.checkedTrackIds));
       setTrackRenames(first.trackRenames);
+      setStaleTrackNames(first.staleTrackNames ?? []);
     }
   }
 
@@ -330,11 +343,13 @@ export function App() {
               c.trackRenames && typeof c.trackRenames === "object"
                 ? (c.trackRenames as Record<string, string>)
                 : {},
+            staleTrackNames: Array.isArray(c.staleTrackNames) ? c.staleTrackNames : [],
           }));
           setConfigs(normalized);
           setSelectedConfigId(normalized[0].id);
           setCheckedTracks(new Set(normalized[0].checkedTrackIds));
           setTrackRenames(normalized[0].trackRenames);
+          setStaleTrackNames(normalized[0].staleTrackNames);
         }
       } catch {
         // ignore malformed files
@@ -364,12 +379,67 @@ export function App() {
     setTrackRenames((prev) => ({ ...prev, [id]: name }));
   }
 
+  function removeStaleTrack(name: string) {
+    setStaleTrackNames((prev) => prev.filter((n) => n !== name));
+  }
+
+  function remapStaleTrack(staleName: string, newTrackId: string) {
+    if (!newTrackId) return;
+    // Update all configs: swap stale name out of checkedTrackIds and staleTrackNames
+    setConfigs((prev) =>
+      prev.map((c) => {
+        const alreadyChecked = c.checkedTrackIds.includes(newTrackId);
+        return {
+          ...c,
+          checkedTrackIds: alreadyChecked
+            ? c.checkedTrackIds
+            : [...c.checkedTrackIds, newTrackId],
+          staleTrackNames: (c.staleTrackNames ?? []).filter((n) => n !== staleName),
+        };
+      }),
+    );
+    // Also update live state for the currently selected config
+    setCheckedTracks((prev) => {
+      const next = new Set(prev);
+      next.add(newTrackId);
+      return next;
+    });
+    setStaleTrackNames((prev) => prev.filter((n) => n !== staleName));
+  }
+
+  function handleSessionChange(name: string) {
+    setSessionName(name);
+    const saved = _sessions[name];
+    if (saved && saved.length > 0) {
+      setConfigs(saved);
+      setSelectedConfigId(saved[0].id);
+      setCheckedTracks(new Set(saved[0].checkedTrackIds));
+      setTrackRenames(saved[0].trackRenames);
+      setStaleTrackNames(saved[0].staleTrackNames ?? []);
+    }
+  }
+
   function applyBatchRename() {
+    let regex: RegExp | null = null;
+    if (batchFind && batchRegex) {
+      try {
+        regex = new RegExp(batchFind, "g");
+        setBatchRegexError("");
+      } catch {
+        setBatchRegexError("Invalid regex");
+        return;
+      }
+    }
+
     const checked = collectCheckedTracks(tracks, checkedTracks);
     const updates: Record<string, string> = {};
     for (const t of checked) {
       let name = trackRenames[t.id] ?? t.name;
-      if (batchFind) name = name.split(batchFind).join(batchReplace);
+      if (batchFind) {
+        name = regex
+          ? name.replace(regex, batchReplace)
+          : name.split(batchFind).join(batchReplace);
+      }
       if (batchPrefix) name = batchPrefix + name;
       if (batchSuffix) name = name + batchSuffix;
       updates[t.id] = name;
@@ -379,12 +449,31 @@ export function App() {
     setBatchSuffix("");
     setBatchFind("");
     setBatchReplace("");
+    setBatchRegexError("");
   }
 
   return (
     <div className="app-shell">
       <div className="app-header">
         <span className="app-title">Stem Export Helper</span>
+      </div>
+
+      <div className="session-bar">
+        <label className="session-label" htmlFor="session-input">Session</label>
+        <input
+          id="session-input"
+          className="session-input"
+          type="text"
+          list="session-list"
+          value={sessionName}
+          placeholder="Required — Name this session to save configs."
+          onChange={(e) => handleSessionChange(e.target.value)}
+        />
+        <datalist id="session-list">
+          {Object.keys(_sessions).map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
       </div>
 
       <div className="app-body">
@@ -439,36 +528,7 @@ export function App() {
             <button type="button" className="btn-ghost config-toolbar-btn config-toolbar-new" onClick={newConfig}>
               + New Config
             </button>
-            <div className="config-toolbar-row">
-              <button
-                type="button"
-                className="btn-ghost config-toolbar-btn"
-                title="Load configs from file"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Load
-              </button>
-              <button
-                type="button"
-                className="btn-ghost config-toolbar-btn"
-                title="Save all configs to file"
-                onClick={saveToFile}
-              >
-                Save
-              </button>
-            </div>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) loadFromFile(file);
-              e.target.value = "";
-            }}
-          />
         </section>
 
         {/* Tracks */}
@@ -481,6 +541,37 @@ export function App() {
               <button type="button" className="btn-ghost btn-xs" onClick={deselectAll}>None</button>
             </div>
           </div>
+          {staleTrackNames.length > 0 && (
+            <div className="stale-warning">
+              <div className="stale-warning-header">
+                ⚠ {staleTrackNames.length} saved track{staleTrackNames.length !== 1 ? "s" : ""} not found in this session
+              </div>
+              {staleTrackNames.map((name) => (
+                <div key={name} className="stale-track-row">
+                  <span className="stale-track-name">"{name}"</span>
+                  <div className="stale-track-actions">
+                    <select
+                      className="stale-remap-select"
+                      defaultValue=""
+                      onChange={(e) => { if (e.target.value) remapStaleTrack(name, e.target.value); }}
+                    >
+                      <option value="">Remap to…</option>
+                      {_flatTracks.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-ghost btn-xs"
+                      onClick={() => removeStaleTrack(name)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="track-list">
             {tracks.length === 0 ? (
               <p className="tracks-empty">No tracks found.</p>
@@ -518,12 +609,12 @@ export function App() {
             <div className="settings-grid">
               <label className="field">
                 <span className="field-label">Find</span>
-                <input className="field-input" type="text" value={batchFind} placeholder="text to find"
-                  onChange={(e) => setBatchFind(e.target.value)} />
+                <input className="field-input" type="text" value={batchFind} placeholder={batchRegex ? "regex pattern" : "text to find"}
+                  onChange={(e) => { setBatchFind(e.target.value); setBatchRegexError(""); }} />
               </label>
               <label className="field">
                 <span className="field-label">Replace</span>
-                <input className="field-input" type="text" value={batchReplace} placeholder="replace with"
+                <input className="field-input" type="text" value={batchReplace} placeholder={batchRegex ? "replacement (use $1, $2…)" : "replace with"}
                   onChange={(e) => setBatchReplace(e.target.value)} />
               </label>
               <label className="field">
@@ -538,6 +629,35 @@ export function App() {
               </label>
             </div>
             <div className="batch-rename-footer">
+              <label className="batch-regex-toggle">
+                <input type="checkbox" checked={batchRegex} onChange={(e) => { setBatchRegex(e.target.checked); setBatchRegexError(""); }} />
+                <span>Regex</span>
+              </label>
+              {batchRegexError && <span className="batch-regex-error">{batchRegexError}</span>}
+            </div>
+            {batchRegex && (
+              <div className="batch-regex-hints">
+                <span className="batch-regex-hints-label">Common patterns:</span>
+                {([
+                  { label: "Remove numbers", find: "\\d+", replace: "" },
+                  { label: "Remove leading numbers", find: "^\\d+\\s*", replace: "" },
+                  { label: "Remove trailing numbers", find: "\\s*\\d+$", replace: "" },
+                  { label: "Remove parentheses", find: "\\s*\\([^)]*\\)", replace: "" },
+                  { label: "Trim spaces", find: "^\\s+|\\s+$", replace: "" },
+                  { label: "Collapse spaces", find: "\\s+", replace: " " },
+                ] as { label: string; find: string; replace: string }[]).map((h) => (
+                  <button
+                    key={h.label}
+                    type="button"
+                    className="batch-regex-hint-btn"
+                    onClick={() => { setBatchFind(h.find); setBatchReplace(h.replace); setBatchRegexError(""); }}
+                  >
+                    {h.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="batch-rename-apply">
               <button
                 type="button"
                 className="btn-ghost btn-sm"
@@ -565,13 +685,14 @@ export function App() {
           <button
             type="button"
             className="btn-ghost btn-sm"
+            disabled={!sessionName.trim()}
             onClick={() => {
               const snapshot = configs.map((c) =>
                 c.id === selectedConfigId
-                  ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames }
+                  ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames }
                   : c,
               );
-              closeWithResult(JSON.stringify({ action: "save", configs: snapshot }));
+              closeWithResult(JSON.stringify({ action: "save", sessionName, configs: snapshot }));
             }}
           >
             Save
@@ -579,15 +700,16 @@ export function App() {
           <button
             type="button"
             className="btn-primary"
-            disabled={checkedTracks.size === 0}
+            disabled={checkedTracks.size === 0 || !sessionName.trim()}
             onClick={() => {
               const snapshot = configs.map((c) =>
                 c.id === selectedConfigId
-                  ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames }
+                  ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames }
                   : c,
               );
               const payload = JSON.stringify({
                 action: "apply",
+                sessionName,
                 checkedTrackIds: [...checkedTracks],
                 trackRenames,
                 configs: snapshot,
