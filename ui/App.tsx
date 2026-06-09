@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./App.css";
 
 // --- Types ---
@@ -96,6 +96,8 @@ function TrackItem({
   onToggle,
   onRename,
   renames,
+  expandedGroups,
+  onToggleExpand,
   depth = 0,
 }: {
   track: Track;
@@ -103,9 +105,11 @@ function TrackItem({
   onToggle: (id: string) => void;
   onRename: (id: string, name: string) => void;
   renames: Record<string, string>;
+  expandedGroups: Set<string>;
+  onToggleExpand: (id: string) => void;
   depth?: number;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const expanded = expandedGroups.has(track.id);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const hasChildren = (track.children?.length ?? 0) > 0;
@@ -136,7 +140,7 @@ function TrackItem({
           <button
             type="button"
             className="track-expand"
-            onClick={() => setExpanded(!expanded)}
+            onClick={() => onToggleExpand(track.id)}
           >
             {expanded ? "▾" : "▸"}
           </button>
@@ -172,11 +176,19 @@ function TrackItem({
             onToggle={onToggle}
             onRename={onRename}
             renames={renames}
+            expandedGroups={expandedGroups}
+            onToggleExpand={onToggleExpand}
             depth={depth + 1}
           />
         ))
       }
     </div>
+  );
+}
+
+function allGroupIds(tracks: Track[]): string[] {
+  return tracks.flatMap((t) =>
+    (t.children?.length ?? 0) > 0 ? [t.id, ...allGroupIds(t.children!)] : [],
   );
 }
 
@@ -229,6 +241,24 @@ export function App() {
   const [batchRegex, setBatchRegex] = useState(false);
   const [batchRegexError, setBatchRegexError] = useState("");
   const [batchOpen, setBatchOpen] = useState(false);
+  const _groupIds = allGroupIds(tracks);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(_groupIds));
+
+  function toggleGroupExpand(id: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function collapseAllGroups() {
+    setExpandedGroups(new Set());
+  }
+
+  function expandAllGroups() {
+    setExpandedGroups(new Set(_groupIds));
+  }
 
   // --- Config management ---
   function selectConfig(id: string) {
@@ -539,6 +569,13 @@ export function App() {
               <span className="track-select-label">Select:</span>
               <button type="button" className="btn-ghost btn-xs" onClick={selectAll}>All</button>
               <button type="button" className="btn-ghost btn-xs" onClick={deselectAll}>None</button>
+              {_groupIds.length > 0 && (
+                <>
+                  <span className="track-select-label" style={{ marginLeft: 4 }}>Groups:</span>
+                  <button type="button" className="btn-ghost btn-xs" onClick={collapseAllGroups}>Collapse</button>
+                  <button type="button" className="btn-ghost btn-xs" onClick={expandAllGroups}>Expand</button>
+                </>
+              )}
             </div>
           </div>
           {staleTrackNames.length > 0 && (
@@ -584,6 +621,8 @@ export function App() {
                   onToggle={toggleTrack}
                   onRename={renameTrack}
                   renames={trackRenames}
+                  expandedGroups={expandedGroups}
+                  onToggleExpand={toggleGroupExpand}
                 />
               ))
             )}
@@ -672,19 +711,25 @@ export function App() {
       </section>
 
       <div className="app-footer">
-        <p className="footer-hint">
-          <span className="footer-hint-icon" aria-hidden="true">ℹ</span>
-          After applying, use{" "}
-          <strong>File &gt; Export Audio/Video</strong> to render the master
-          mix or individual stems.
-        </p>
+        <div className="footer-hints">
+          <p className="footer-hint">
+            <span className="footer-hint-icon" aria-hidden="true">ℹ</span>
+            After applying, use <strong>File &gt; Export Audio/Video</strong> to render stems. Render Main for a mixdown, or All Individual Tracks to export stems.
+          </p>
+          {_groupIds.length > 0 && (
+            <p className="footer-hint">
+              <span className="footer-hint-icon" aria-hidden="true">⌨</span>
+              Tip: Use <strong>⌥U</strong> to collapse groups for easier track selection.
+            </p>
+          )}
+        </div>
         <div className="footer-actions">
-          <button type="button" className="btn-ghost btn-sm" onClick={() => closeWithResult("cancel")}>
+          <button type="button" className="btn-ghost" onClick={() => closeWithResult("cancel")}>
             Cancel
           </button>
           <button
             type="button"
-            className="btn-ghost btn-sm"
+            className="btn-ghost"
             disabled={!sessionName.trim()}
             onClick={() => {
               const snapshot = configs.map((c) =>

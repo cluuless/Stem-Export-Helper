@@ -292,8 +292,8 @@ body {
   border: none;
   color: #6b7585;
   cursor: pointer;
-  font-size: 11px;
-  padding: 0;
+  font-size: 15px;
+  padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -494,10 +494,9 @@ body {
 /* ---- Footer ---- */
 .app-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px;
   border-top: 1px solid #2a2e38;
   flex-shrink: 0;
 }
@@ -510,7 +509,12 @@ body {
   font-size: 11px;
   color: #707888;
   line-height: 1.4;
-  max-width: 340px;
+}
+
+.footer-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .footer-hint-icon {
@@ -529,7 +533,6 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
 }
 
 .btn-ghost {
@@ -537,8 +540,8 @@ body {
   border: 1px solid #3a4050;
   border-radius: 5px;
   color: #b0b8c8;
-  font-size: 12px;
-  padding: 5px 10px;
+  font-size: 13px;
+  padding: 7px 14px;
   cursor: pointer;
   font-family: inherit;
 }
@@ -554,13 +557,18 @@ body {
   align-self: flex-start;
 }
 
+.footer-actions .btn-ghost,
+.footer-actions .btn-primary {
+  flex: 1;
+}
+
 .btn-primary {
   background: #3a5fa0;
   border: 1px solid #4a70b8;
   border-radius: 5px;
   color: #f3f5f8;
-  font-size: 12px;
-  padding: 5px 14px;
+  font-size: 13px;
+  padding: 7px 14px;
   cursor: pointer;
   font-family: inherit;
   font-weight: 500;

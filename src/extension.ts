@@ -172,7 +172,7 @@ export function activate(activation: ActivationContext) {
       payload,
     );
     const url = `data:text/html,${encodeURIComponent(htmlWithData)}`;
-    context.ui.showModalDialog(url, 680, 480).then((result) => {
+    context.ui.showModalDialog(url, 680, 540).then((result) => {
       if (result === "cancel") return;
 
       let config: ApplyConfig;

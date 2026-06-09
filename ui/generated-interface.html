@@ -1570,8 +1570,8 @@ body {
   border: none;
   color: #6b7585;
   cursor: pointer;
-  font-size: 11px;
-  padding: 0;
+  font-size: 15px;
+  padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -1741,10 +1741,9 @@ body {
 }
 .app-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px;
   border-top: 1px solid #2a2e38;
   flex-shrink: 0;
 }
@@ -1756,7 +1755,11 @@ body {
   font-size: 11px;
   color: #707888;
   line-height: 1.4;
-  max-width: 340px;
+}
+.footer-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 .footer-hint-icon {
   font-style: normal;
@@ -1772,15 +1775,14 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
 }
 .btn-ghost {
   background: none;
   border: 1px solid #3a4050;
   border-radius: 5px;
   color: #b0b8c8;
-  font-size: 12px;
-  padding: 5px 10px;
+  font-size: 13px;
+  padding: 7px 14px;
   cursor: pointer;
   font-family: inherit;
 }
@@ -1793,13 +1795,17 @@ body {
   margin: 4px 6px 6px;
   align-self: flex-start;
 }
+.footer-actions .btn-ghost,
+.footer-actions .btn-primary {
+  flex: 1;
+}
 .btn-primary {
   background: #3a5fa0;
   border: 1px solid #4a70b8;
   border-radius: 5px;
   color: #f3f5f8;
-  font-size: 12px;
-  padding: 5px 14px;
+  font-size: 13px;
+  padding: 7px 14px;
   cursor: pointer;
   font-family: inherit;
   font-weight: 500;
@@ -14671,9 +14677,11 @@ body {
     onToggle,
     onRename,
     renames,
+    expandedGroups,
+    onToggleExpand,
     depth = 0
   }) {
-    const [expanded, setExpanded] = (0, import_react.useState)(true);
+    const expanded = expandedGroups.has(track.id);
     const [isEditing, setIsEditing] = (0, import_react.useState)(false);
     const [editValue, setEditValue] = (0, import_react.useState)("");
     const hasChildren = (track.children?.length ?? 0) > 0;
@@ -14704,7 +14712,7 @@ body {
           {
             type: "button",
             className: "track-expand",
-            onClick: () => setExpanded(!expanded),
+            onClick: () => onToggleExpand(track.id),
             children: expanded ? "\u25BE" : "\u25B8"
           }
         ),
@@ -14739,11 +14747,18 @@ body {
           onToggle,
           onRename,
           renames,
+          expandedGroups,
+          onToggleExpand,
           depth: depth + 1
         },
         child.id
       ))
     ] });
+  }
+  function allGroupIds(tracks) {
+    return tracks.flatMap(
+      (t) => (t.children?.length ?? 0) > 0 ? [t.id, ...allGroupIds(t.children)] : []
+    );
   }
   var _payload = loadPayload();
   var _flatTracks = _payload.tracks;
@@ -14788,6 +14803,22 @@ body {
     const [batchRegex, setBatchRegex] = (0, import_react.useState)(false);
     const [batchRegexError, setBatchRegexError] = (0, import_react.useState)("");
     const [batchOpen, setBatchOpen] = (0, import_react.useState)(false);
+    const _groupIds = allGroupIds(tracks);
+    const [expandedGroups, setExpandedGroups] = (0, import_react.useState)(() => new Set(_groupIds));
+    function toggleGroupExpand(id) {
+      setExpandedGroups((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }
+    function collapseAllGroups() {
+      setExpandedGroups(/* @__PURE__ */ new Set());
+    }
+    function expandAllGroups() {
+      setExpandedGroups(new Set(_groupIds));
+    }
     function selectConfig(id) {
       setConfigs(
         (prev) => prev.map(
@@ -15045,7 +15076,12 @@ body {
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "track-select-actions", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "track-select-label", children: "Select:" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-xs", onClick: selectAll, children: "All" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-xs", onClick: deselectAll, children: "None" })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-xs", onClick: deselectAll, children: "None" }),
+              _groupIds.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "track-select-label", style: { marginLeft: 4 }, children: "Groups:" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-xs", onClick: collapseAllGroups, children: "Collapse" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-xs", onClick: expandAllGroups, children: "Expand" })
+              ] })
             ] })
           ] }),
           staleTrackNames.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "stale-warning", children: [
@@ -15096,7 +15132,9 @@ body {
               checked: checkedTracks,
               onToggle: toggleTrack,
               onRename: renameTrack,
-              renames: trackRenames
+              renames: trackRenames,
+              expandedGroups,
+              onToggleExpand: toggleGroupExpand
             },
             track.id
           )) })
@@ -15230,20 +15268,27 @@ body {
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "app-footer", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "footer-hint", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "footer-hint-icon", "aria-hidden": "true", children: "\u2139" }),
-          "After applying, use",
-          " ",
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "File > Export Audio/Video" }),
-          " to render the master mix or individual stems."
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "footer-hints", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "footer-hint", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "footer-hint-icon", "aria-hidden": "true", children: "\u2139" }),
+            "After applying, use ",
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "File > Export Audio/Video" }),
+            " to render stems. Render Main for a mixdown, or All Individual Tracks to export stems."
+          ] }),
+          _groupIds.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "footer-hint", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "footer-hint-icon", "aria-hidden": "true", children: "\u2328" }),
+            "Tip: Use ",
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "\u2325U" }),
+            " to collapse groups for easier track selection."
+          ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "footer-actions", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost btn-sm", onClick: () => closeWithResult("cancel"), children: "Cancel" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "btn-ghost", onClick: () => closeWithResult("cancel"), children: "Cancel" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
             "button",
             {
               type: "button",
-              className: "btn-ghost btn-sm",
+              className: "btn-ghost",
               disabled: !sessionName.trim(),
               onClick: () => {
                 const snapshot = configs.map(
