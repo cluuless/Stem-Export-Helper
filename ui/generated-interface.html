@@ -1389,6 +1389,21 @@ body {
 .session-input:focus {
   border-color: #4a6fa8;
 }
+.session-input--warn {
+  border-color: #c87c2a;
+  animation: shake 0.3s ease;
+}
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
 .session-input::placeholder {
   color: #3a4050;
 }
@@ -1770,6 +1785,12 @@ body {
 .footer-hint strong {
   color: #8fafd4;
   font-weight: 500;
+}
+.footer-hint--warn {
+  color: #c87c2a;
+}
+.footer-hint--warn .footer-hint-icon {
+  color: #c87c2a;
 }
 .footer-actions {
   display: flex;
@@ -14796,6 +14817,7 @@ body {
       () => _initialConfigs.length > 0 ? _initialConfigs[0].staleTrackNames ?? [] : []
     );
     const [sessionName, setSessionName] = (0, import_react.useState)(_currentSession);
+    const [showSessionWarning, setShowSessionWarning] = (0, import_react.useState)(false);
     const [batchPrefix, setBatchPrefix] = (0, import_react.useState)("");
     const [batchSuffix, setBatchSuffix] = (0, import_react.useState)("");
     const [batchFind, setBatchFind] = (0, import_react.useState)("");
@@ -15007,12 +15029,15 @@ body {
           "input",
           {
             id: "session-input",
-            className: "session-input",
+            className: `session-input${showSessionWarning ? " session-input--warn" : ""}`,
             type: "text",
             list: "session-list",
             value: sessionName,
             placeholder: "Required \u2014 Name this session to save configs.",
-            onChange: (e) => handleSessionChange(e.target.value)
+            onChange: (e) => {
+              handleSessionChange(e.target.value);
+              setShowSessionWarning(false);
+            }
           }
         ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("datalist", { id: "session-list", children: Object.keys(_sessions).map((name) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: name }, name)) })
@@ -15280,6 +15305,10 @@ body {
             "Tip: Use ",
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "\u2325U" }),
             " to collapse groups for easier track selection."
+          ] }),
+          showSessionWarning && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "footer-hint footer-hint--warn", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "footer-hint-icon", "aria-hidden": "true", children: "\u26A0" }),
+            "Enter a session name above before applying."
           ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "footer-actions", children: [
@@ -15291,6 +15320,10 @@ body {
               className: "btn-ghost",
               disabled: !sessionName.trim(),
               onClick: () => {
+                if (!sessionName.trim()) {
+                  setShowSessionWarning(true);
+                  return;
+                }
                 const snapshot = configs.map(
                   (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames } : c
                 );
@@ -15304,8 +15337,13 @@ body {
             {
               type: "button",
               className: "btn-primary",
-              disabled: checkedTracks.size === 0 || !sessionName.trim(),
+              disabled: checkedTracks.size === 0,
               onClick: () => {
+                if (!sessionName.trim()) {
+                  setShowSessionWarning(true);
+                  document.getElementById("session-input")?.focus();
+                  return;
+                }
                 const snapshot = configs.map(
                   (c) => c.id === selectedConfigId ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames } : c
                 );

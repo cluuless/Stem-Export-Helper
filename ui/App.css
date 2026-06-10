@@ -79,6 +79,17 @@ body {
   border-color: #4a6fa8;
 }
 
+.session-input--warn {
+  border-color: #c87c2a;
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
 .session-input::placeholder {
   color: #3a4050;
 }
@@ -527,6 +538,14 @@ body {
 .footer-hint strong {
   color: #8fafd4;
   font-weight: 500;
+}
+
+.footer-hint--warn {
+  color: #c87c2a;
+}
+
+.footer-hint--warn .footer-hint-icon {
+  color: #c87c2a;
 }
 
 .footer-actions {

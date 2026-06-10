@@ -232,6 +232,7 @@ export function App() {
     _initialConfigs.length > 0 ? (_initialConfigs[0].staleTrackNames ?? []) : [],
   );
   const [sessionName, setSessionName] = useState(_currentSession);
+  const [showSessionWarning, setShowSessionWarning] = useState(false);
 
   // Batch rename state
   const [batchPrefix, setBatchPrefix] = useState("");
@@ -492,12 +493,12 @@ export function App() {
         <label className="session-label" htmlFor="session-input">Session</label>
         <input
           id="session-input"
-          className="session-input"
+          className={`session-input${showSessionWarning ? " session-input--warn" : ""}`}
           type="text"
           list="session-list"
           value={sessionName}
           placeholder="Required — Name this session to save configs."
-          onChange={(e) => handleSessionChange(e.target.value)}
+          onChange={(e) => { handleSessionChange(e.target.value); setShowSessionWarning(false); }}
         />
         <datalist id="session-list">
           {Object.keys(_sessions).map((name) => (
@@ -722,6 +723,12 @@ export function App() {
               Tip: Use <strong>⌥U</strong> to collapse groups for easier track selection.
             </p>
           )}
+          {showSessionWarning && (
+            <p className="footer-hint footer-hint--warn">
+              <span className="footer-hint-icon" aria-hidden="true">⚠</span>
+              Enter a session name above before applying.
+            </p>
+          )}
         </div>
         <div className="footer-actions">
           <button type="button" className="btn-ghost" onClick={() => closeWithResult("cancel")}>
@@ -732,6 +739,7 @@ export function App() {
             className="btn-ghost"
             disabled={!sessionName.trim()}
             onClick={() => {
+              if (!sessionName.trim()) { setShowSessionWarning(true); return; }
               const snapshot = configs.map((c) =>
                 c.id === selectedConfigId
                   ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames }
@@ -745,8 +753,9 @@ export function App() {
           <button
             type="button"
             className="btn-primary"
-            disabled={checkedTracks.size === 0 || !sessionName.trim()}
+            disabled={checkedTracks.size === 0}
             onClick={() => {
+              if (!sessionName.trim()) { setShowSessionWarning(true); document.getElementById("session-input")?.focus(); return; }
               const snapshot = configs.map((c) =>
                 c.id === selectedConfigId
                   ? { ...c, checkedTrackIds: [...checkedTracks], trackRenames, staleTrackNames }
