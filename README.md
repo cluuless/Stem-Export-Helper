@@ -101,14 +101,3 @@ Check **Regex** to treat the Find field as a regular expression. The Replace fie
 | **Apply to Live Set** | Mute/unmute tracks, apply renames, and save configs |
 
 After applying, use **File › Export Audio/Video** (⌘⇧R / Ctrl⇧R) to render your stems.
-
----
-
-## Development
-
-```sh
-pnpm start          # build + run in Live's Extension Host
-pnpm build          # production bundle
-pnpm build:dev      # dev bundle (sourcemaps, not minified)
-pnpm package        # production build + .ablx archive
-```
